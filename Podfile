@@ -14,4 +14,6 @@ pod 'SwiftSiriWaveformView'
 pod 'Hero'
 pod 'MBProgressHUD'
 pod 'SMPageControl'
+pod 'SwiftyStoreKit'
+pod 'SDWebImage'
 end
