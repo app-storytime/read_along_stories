@@ -14,9 +14,16 @@ enum EndState : Int{
     case backscreen = 1
     case replay = 2
     case next = 3
+    case speakword = 4
 }
 
 class ExperienceViewController: BaseViewController {
+    
+    @IBOutlet var longpressGesture: UILongPressGestureRecognizer!
+    @IBOutlet var tapGesture: UITapGestureRecognizer!
+    
+    let synth = AVSpeechSynthesizer()
+    var myUtterance = AVSpeechUtterance(string: "")
     
     var timer = Timer()
     var counter:Int = 0
@@ -39,8 +46,12 @@ class ExperienceViewController: BaseViewController {
     
     let speechRecognizer = SpeechRecognizer.shared
     
+    var m_sWord = ""
+    var m_bIsSpeak = false
     override open func viewDidLoad() {
         super.viewDidLoad()
+        
+        synth.delegate = self
         
         speechRecognizer.recognizerDelegate = self
         speechRecognizer.startRecording()
@@ -169,6 +180,7 @@ class ExperienceViewController: BaseViewController {
     @objc func updateTimer(){
         counter += 1
     }
+
     
     func startTimer(){
         if !isTimerRunning{
@@ -177,6 +189,40 @@ class ExperienceViewController: BaseViewController {
             counter = 0
             timer = Timer.scheduledTimer(timeInterval: 1, target: self, selector: #selector(updateTimer), userInfo: nil, repeats: true)
         }
+    }
+    
+    @IBAction func onLongpress(_ sender: UILongPressGestureRecognizer) {
+        if sender.state == .began {
+            let sWord = getWordFromGesture(gesture: sender)
+            if sWord != "" {
+                if(speechRecognizer.isStarted){
+                    if !m_bIsSpeak{
+                        m_bIsSpeak = true
+                        MBProgressHUD.showAdded(to: self.view, animated: true)
+                        m_sWord = sWord
+                        speechRecognizer.stopRecording(status: EndState.speakword.rawValue)
+                    }
+                }else
+                {
+                    self.speakWith(word: sWord)
+                }
+            }
+        }
+    }
+    
+    @IBAction func onTap(_ sender: UITapGestureRecognizer) {
+        let sWord = getWordFromGesture(gesture: sender)
+        if sWord != "" {
+            openDicWith(word: sWord)
+        }
+    }
+}
+
+extension ExperienceViewController: AVSpeechSynthesizerDelegate{
+    func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
+        m_bIsSpeak = false
+        speechRecognizer.startRecording()
+        MBProgressHUD.hide(for: self.view, animated: true)
     }
 }
 //SpeechRecognizerDelegate Methods
@@ -232,12 +278,61 @@ extension ExperienceViewController: SpeechRecognizerDelegate {
             replaySentence()
         }else if status == EndState.next.rawValue{
             prepareNextSentence()
+        }else if status == EndState.speakword.rawValue{
+            speakWith(word: m_sWord)
         }
     }
 }
 // Self Definition Methods
 extension ExperienceViewController {
+    func getWordFromGesture(gesture:UIGestureRecognizer) -> String{
+        var text = ""
+        if let textView = gesture.view as? UITextView {
+            let layoutManager = textView.layoutManager
+            var location = gesture.location(in: textView)
+            location.x -= textView.textContainerInset.left
+            location.y -= textView.textContainerInset.top
+            
+            let characterIndex = layoutManager.characterIndex(for: location, in: textView.textContainer, fractionOfDistanceBetweenInsertionPoints: nil)
+            
+            if(characterIndex < textView.textStorage.length){
+                //print("character index: \(characterIndex)")
+                
+                // print the character at the index successfully
+                //let myRange = NSRange(location: characterIndex, length: 1)
+                //let substring = (textView.attributedText.string as NSString).substring(with: myRange)
+                //print("character at index: \(substring)")
+                
+                let tapPosition: UITextPosition? = textView.closestPosition(to: location)
+                //fetch the word at this position (or nil, if not available)
+                if let textRange = textView.tokenizer.rangeEnclosingPosition(tapPosition!, with: .word, inDirection: 1) {
+                    if let tappedWord = textView.text(in: textRange) {
+                        print("selected word :\(tappedWord)")
+                        //This only prints when I seem to tap the first letter of word.
+                        text = tappedWord
+                    }
+                }
+            }
+        }
+        return text
+    }
     
+    func openDicWith(word:String){
+        if UIReferenceLibraryViewController.dictionaryHasDefinition(forTerm: word) {
+            MBProgressHUD.showAdded(to: self.view, animated: true)
+            let ref: UIReferenceLibraryViewController = UIReferenceLibraryViewController(term: word)
+            self.present(ref, animated: true, completion: {
+                MBProgressHUD.hide(for: self.view, animated: true)
+            })
+        }
+    }
+    
+    func speakWith(word:String) {
+        myUtterance = AVSpeechUtterance(string: word)
+        myUtterance.volume = 1
+        //myUtterance.rate = 0.3
+        synth.speak(myUtterance)
+    }
     func MakescrollTextView(scrollView: UIScrollView, displayStr:String) {
         //Make Scroll Text View
         let maxSize = CGSize(width: 9999, height: 9999)
@@ -250,9 +345,12 @@ extension ExperienceViewController {
         let textView = self.textview
         textView?.isEditable = false
         textView?.isScrollEnabled = false//let textView becomes unScrollable
+        textView?.isSelectable = false
         textView?.font = font
         textView?.text = displayStr
         
+        textView?.addGestureRecognizer(tapGesture)
+        textView?.addGestureRecognizer(longpressGesture)
         scrollView.contentSize = CGSize(width: strSize.width, height: 50)
         
         scrollView.addSubview(textView!)
