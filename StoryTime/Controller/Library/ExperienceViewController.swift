@@ -7,7 +7,7 @@
 
 import UIKit
 import AVFoundation
-import MBProgressHUD
+import ProgressHUD
 import Lottie
 
 enum EndState : Int{
@@ -16,15 +16,29 @@ enum EndState : Int{
     case replay = 2
     case next = 3
     case speakword = 4
+    case incorrect = 5
 }
 
 class ExperienceViewController: BaseViewController {
+    struct WordInfo{
+        var pos : Int   //Letter Position
+        var index : Int //Word index
+        var word : String //Fresh word
+        var wordOrg : String //Original word with special characters
+    }
+    
+    struct WordIndexInfo{
+        var scene: Int
+        var sentence: Int
+        var word : Int
+    }
     
     @IBOutlet var longpressGesture: UILongPressGestureRecognizer!
     @IBOutlet var tapGesture: UITapGestureRecognizer!
     
     @IBOutlet weak var scrollView: UIScrollView!
     @IBOutlet weak var lblSpeaking: UILabel!
+    @IBOutlet weak var lblSpeakCorrect: UILabel!
     
     @IBOutlet weak var waveformView: WaveformView!
     @IBOutlet weak var userImage: UIImageView!
@@ -47,22 +61,22 @@ class ExperienceViewController: BaseViewController {
     var textview: UITextView!
     var levelStr = 0
     var nIdxSentence = 0
-    var arrWords: [[String]] = []
-    var arrSpeech: [String] = []
+    //var arrWords: [[String]] = []
+    //var arrSpeech: [String] = []
     
     //New reading style
     var sStorySentence = ""
-    var arrSWords: [[[String]]] = []
-    var nScene = 0
-    var nSentence = 0
-    var nWord = 0
+    var arrSWords: [[[String]]] = [] // Story Word by remove special characters - Scene/Sentence/Word
+    var arrWords = [String]() //Whole story words without special
+    var arrRawWords: [String] = [] //Raw story words
+    var bCorrectCnt = false
+    var nReadWordIndex = 0
     
     //For dictionary and speak, when tap and long press
     var m_sWord = ""
     var m_bIsSpeak = false
     let synth = AVSpeechSynthesizer()
     var myUtterance = AVSpeechUtterance(string: "")
-    
     
     override open func viewDidLoad() {
         super.viewDidLoad()
@@ -110,13 +124,16 @@ class ExperienceViewController: BaseViewController {
         for scene in (self.story?.scenes)!{
             var aScene = [[String]]()
             for sentence in scene.sentences{
-                sStorySentence += sentence + " "
-                let words = sentence.components(separatedBy: " ")
+                let sentence_trimmed = sentence.trimmingCharacters(in: .whitespaces)
+                sStorySentence += sentence_trimmed + " "
+                let words = sentence_trimmed.components(separatedBy: " ")
                 
                 var aSentense = [String]()
                 for word in words{
                     let w = removeSpecialCharFrom(string: word).lowercased()
                     aSentense.append(w)
+                    
+                    arrWords.append(w)
                 }
                 
                 aScene.append(aSentense)
@@ -124,6 +141,9 @@ class ExperienceViewController: BaseViewController {
             
             arrSWords.append(aScene)
         }
+        
+        sStorySentence = sStorySentence.trimmingCharacters(in: .whitespaces)
+        arrRawWords = sStorySentence.components(separatedBy: " ")
         
         makeScrollTextView(scrollView: scrollView, displayStr: sStorySentence)
         //Make Horizontal TextView
@@ -134,13 +154,11 @@ class ExperienceViewController: BaseViewController {
         }*/
         //Make Arrary of words...
         
-        for sentence in (self.story?.sentences)! {
+        /*for sentence in (self.story?.sentences)! {
             arrWords.append(sentence.components(separatedBy: " "))
-        }
+        }*/
     }
-    func removeSpecialCharFrom(string:String)->String{
-        return string.components(separatedBy: CharacterSet.alphanumerics.inverted).joined()
-    }
+    
     func prepareNextSentence(){
         if nIdxSentence < arrWords.count-1
         {
@@ -156,6 +174,10 @@ class ExperienceViewController: BaseViewController {
     
     func replaySentence(){
         makeScrollTextView(scrollView: scrollView, displayStr: (self.story?.sentences[nIdxSentence])!)
+        speechRecognizer.startRecording()
+    }
+    
+    func speakAgain(){
         speechRecognizer.startRecording()
     }
     
@@ -185,6 +207,22 @@ class ExperienceViewController: BaseViewController {
     
     //For the Wave form view
     func startWaveForm(){
+        waveformView.bUseCustomColor = true
+        
+        //waveformView.numberOfWaves = 18
+        //waveformView.secondaryWaveLineWidth = 1.0
+        waveformView.numberOfWaves = 12
+        waveformView.secondaryWaveLineWidth = 1.5
+        waveformView.colorsCustom = [
+            UIColor(red: 195/255.0, green: 47/255.0, blue: 91/255.0, alpha: 1),
+            UIColor(red: 240/255.0, green: 179/255.0, blue: 84/255.0, alpha: 1),
+            UIColor(red: 151/255.0, green: 196/255.0, blue: 85/255.0, alpha: 1),
+            UIColor(red: 244/255.0, green: 129/255.0, blue: 230/255.0, alpha: 1),
+            UIColor(red: 79/255.0, green: 175/255.0, blue: 206/255.0, alpha: 1),
+            UIColor(red: 47/255.0, green: 111/255.0, blue: 182/255.0, alpha: 1),
+        ]
+        
+        //input
         audioRecorder = audioRecorder(URL(fileURLWithPath:"/dev/null"))
         audioRecorder.record()
         
@@ -233,9 +271,19 @@ class ExperienceViewController: BaseViewController {
         timer.invalidate()
     }
     
+    //UI Actions
+    @IBAction func onTest(_ sender: Any) {
+        let wordinfo = getWordInfo(byWordIndex: 7)
+        print("\(wordinfo)")
+        
+        let wordIndexInfo = getWordIndexInfo(byWordIndex: 7)
+        print("\(wordIndexInfo)")
+    }
+    
+
     @IBAction func btnBackClicked(_ sender: Any) {
         //navigationController?.popViewController(animated: true)
-        MBProgressHUD.showAdded(to: self.view, animated: true)
+        ProgressHUD.show("Loading...", interaction: false)
         stopTimer()
         if speechRecognizer.isStarted{
             speechRecognizer.stopRecording(status: EndState.backscreen.rawValue)
@@ -253,12 +301,11 @@ class ExperienceViewController: BaseViewController {
                 if(speechRecognizer.isStarted){
                     if !m_bIsSpeak{
                         m_bIsSpeak = true
-                        MBProgressHUD.showAdded(to: self.view, animated: true)
+                        ProgressHUD.show("Loading...", interaction: false)
                         m_sWord = sWord
                         speechRecognizer.stopRecording(status: EndState.speakword.rawValue)
                     }
-                }else
-                {
+                }else{
                     self.speakWith(word: sWord)
                 }
             }
@@ -279,7 +326,7 @@ extension ExperienceViewController: AVSpeechSynthesizerDelegate{
     func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
         m_bIsSpeak = false
         speechRecognizer.startRecording()
-        MBProgressHUD.hide(for: self.view, animated: true)
+        ProgressHUD.dismiss()
     }
 }
 
@@ -290,10 +337,34 @@ extension ExperienceViewController: SpeechRecognizerDelegate {
         // Get last word of speech
         startTimer()
         
-        arrSpeech = speech.components(separatedBy: " ")
+        let aSpeech = speech.components(separatedBy: " ")
         lblSpeaking.text = speech;
         
-        var isAllCorrect = true
+        var correctCnt = 0
+        
+        for i in 0..<aSpeech.count{
+            let wordIndex = nReadWordIndex + i
+            let speechWord = removeSpecialCharFrom(string: aSpeech[i].lowercased())
+            // if keep saying word correctly, just pass, if say incorrect, need to pause
+            if wordIndex < arrWords.count{
+                print("to compare with \(arrWords[wordIndex]) - \(speechWord)")
+                
+                if arrWords[wordIndex] == speechWord{
+                    correctCnt = i+1
+                    print("correct \(i)")
+                }else{
+                    print("incorrect\(i)")
+                    speechRecognizer.stopRecording(status: EndState.incorrect.rawValue)
+                    break
+                }
+            }
+        }
+        
+        nReadWordIndex += correctCnt
+        print("readWord: \(nReadWordIndex)")
+        
+        
+        /*var isAllCorrect = true
         
         if arrSpeech.count > arrWords[nIdxSentence].count {
             isAllCorrect = false
@@ -320,7 +391,7 @@ extension ExperienceViewController: SpeechRecognizerDelegate {
             speechRecognizer.stopRecording(status: EndState.replay.rawValue)
             wrongCnt += 1
             print("incorrect")
-        }
+        }*/
     }
     
     func onEnd(_ status: Int){
@@ -331,6 +402,7 @@ extension ExperienceViewController: SpeechRecognizerDelegate {
             speechRecognizer.startRecording()
         }
         else if status == EndState.backscreen.rawValue {
+            ProgressHUD.dismiss()
             self.navigationController?.popViewController(animated: true)
         }else if status == EndState.replay.rawValue{
             replaySentence()
@@ -338,12 +410,15 @@ extension ExperienceViewController: SpeechRecognizerDelegate {
             prepareNextSentence()
         }else if status == EndState.speakword.rawValue{
             speakWith(word: m_sWord)
+        }else if status == EndState.incorrect.rawValue{
+            speakAgain()
         }
     }
 }
 
 // Self Definition Methods
 extension ExperienceViewController {
+    //Gesture Part
     func getWordFromGesture(gesture:UIGestureRecognizer) -> String{
         var text = ""
         if let textView = gesture.view as? UITextView {
@@ -378,10 +453,10 @@ extension ExperienceViewController {
     
     func openDicWith(word:String){
         if UIReferenceLibraryViewController.dictionaryHasDefinition(forTerm: word) {
-            MBProgressHUD.showAdded(to: self.view, animated: true)
+            ProgressHUD.show("Loading...", interaction: false)
             let ref: UIReferenceLibraryViewController = UIReferenceLibraryViewController(term: word)
             self.present(ref, animated: true, completion: {
-                MBProgressHUD.hide(for: self.view, animated: true)
+                ProgressHUD.dismiss()
             })
         }
     }
@@ -392,7 +467,7 @@ extension ExperienceViewController {
             try audioSession.setCategory(AVAudioSessionCategoryPlayAndRecord, with: .defaultToSpeaker)
         }catch {
             print("audioSession properties weren't set because of an error.")
-            MBProgressHUD.hide(for: self.view, animated: true)
+            ProgressHUD.dismiss()
         }
         myUtterance = AVSpeechUtterance(string: word)
         myUtterance.volume = 1
@@ -400,6 +475,7 @@ extension ExperienceViewController {
         synth.speak(myUtterance)
     }
     
+    //Scroll Part
     func makeScrollTextView(scrollView: UIScrollView, displayStr:String) {
         //Make Scroll Text View
         let maxSize = CGSize(width: Int.max, height: 60)
@@ -435,7 +511,52 @@ extension ExperienceViewController {
             , NSAttributedStringKey.foregroundColor : UIColor(red: 1.0, green: 0, blue: 0, alpha: 1.0)], range: NSRange(location:startPos,length:endPos - startPos))
         return myMutableString
     }
-    func GetRedColorForWrongWord(text: String, word: String) -> NSMutableAttributedString{
+    
+    func getWordIndexInfo(byWordIndex: Int) -> WordIndexInfo{
+        var nTotalWordCount = 0
+        for i in 0..<arrSWords.count{
+            for j in 0..<arrSWords[i].count{
+                if byWordIndex < nTotalWordCount + arrSWords[i][j].count{
+                    let nWord = byWordIndex - nTotalWordCount
+                    
+                    return WordIndexInfo(scene: i, sentence: j, word: nWord)
+                }else{
+                    nTotalWordCount += arrSWords[i][j].count
+                }
+            }
+        }
+        return WordIndexInfo(scene: 0, sentence: 0, word: 0)
+    }
+    
+    func getWordInfo(byWordIndex: Int) -> WordInfo{
+        return getWordInfoFromWordList(words: arrRawWords, byWordIndex: byWordIndex)
+    }
+    
+    func getWordInfo(fromString:String, byWordIndex: Int) -> WordInfo{
+        let aWords = fromString.components(separatedBy: " ")
+        return getWordInfoFromWordList(words: aWords, byWordIndex: byWordIndex)
+    }
+    
+    func getWordInfoFromWordList(words:[String], byWordIndex: Int) -> WordInfo{
+        let myWord = words[byWordIndex]
+        let newWord = removeSpecialCharFrom(string: myWord)
+        
+        var letterPostion = 0
+        //if(byWordIndex > 0){
+            for i in 0..<byWordIndex{
+                letterPostion += words[i].count
+                letterPostion += 1 //For Space
+            }
+        //}
+        
+        return WordInfo(pos: letterPostion, index:byWordIndex, word: newWord, wordOrg: myWord)
+    }
+    
+    func removeSpecialCharFrom(string:String)->String{
+        return string.components(separatedBy: CharacterSet.alphanumerics.inverted).joined()
+    }
+    
+    func getRedColorForWrongWord(text: String, word: String) -> NSMutableAttributedString{
         
         var startPos = 0, endPos = 0
         if let range = text.range(of: word) {
@@ -453,17 +574,3 @@ extension ExperienceViewController {
         return myMutableString
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
