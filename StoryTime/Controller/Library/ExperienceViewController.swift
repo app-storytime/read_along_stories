@@ -273,11 +273,18 @@ class ExperienceViewController: BaseViewController {
     
     //UI Actions
     @IBAction func onTest(_ sender: Any) {
-        let wordinfo = getWordInfo(byWordIndex: 7)
+        /*let wordinfo = getWordInfo(byWordIndex: 7)
         print("\(wordinfo)")
         
         let wordIndexInfo = getWordIndexInfo(byWordIndex: 7)
-        print("\(wordIndexInfo)")
+        print("\(wordIndexInfo)")*/
+        
+        processSentence(speech: "This is")
+        processSentence(speech: "This is sentence")
+        processSentence(speech: "This is sentence aaa")
+        processSentence(speech: "one")
+        processSentence(speech: "one this is ss")
+        
     }
     
 
@@ -337,61 +344,7 @@ extension ExperienceViewController: SpeechRecognizerDelegate {
         // Get last word of speech
         startTimer()
         
-        let aSpeech = speech.components(separatedBy: " ")
-        lblSpeaking.text = speech;
-        
-        var correctCnt = 0
-        
-        for i in 0..<aSpeech.count{
-            let wordIndex = nReadWordIndex + i
-            let speechWord = removeSpecialCharFrom(string: aSpeech[i].lowercased())
-            // if keep saying word correctly, just pass, if say incorrect, need to pause
-            if wordIndex < arrWords.count{
-                print("to compare with \(arrWords[wordIndex]) - \(speechWord)")
-                
-                if arrWords[wordIndex] == speechWord{
-                    correctCnt = i+1
-                    print("correct \(i)")
-                }else{
-                    print("incorrect\(i)")
-                    speechRecognizer.stopRecording(status: EndState.incorrect.rawValue)
-                    break
-                }
-            }
-        }
-        
-        nReadWordIndex += correctCnt
-        print("readWord: \(nReadWordIndex)")
-        
-        
-        /*var isAllCorrect = true
-        
-        if arrSpeech.count > arrWords[nIdxSentence].count {
-            isAllCorrect = false
-        }
-        else{
-            for i in 0 ..< min(arrWords[nIdxSentence].count, arrSpeech.count){
-                if arrSpeech[i].caseInsensitiveCompare(self.arrWords[nIdxSentence][i]) != ComparisonResult.orderedSame {
-                    isAllCorrect = false
-                    break
-                }
-            }
-        }
-        
-        if isAllCorrect{
-            if arrSpeech.count == self.arrWords[nIdxSentence].count{ //Whole Sentence Correct
-                //Prepare next sentence
-                speechRecognizer.stopRecording(status: EndState.next.rawValue)
-                print("correct sentence")
-            }else{ //Just spoke partial
-                
-            }
-        }
-        else{ //incorrect
-            speechRecognizer.stopRecording(status: EndState.replay.rawValue)
-            wrongCnt += 1
-            print("incorrect")
-        }*/
+        processSentence(speech: speech)
     }
     
     func onEnd(_ status: Int){
@@ -413,6 +366,95 @@ extension ExperienceViewController: SpeechRecognizerDelegate {
         }else if status == EndState.incorrect.rawValue{
             speakAgain()
         }
+    }
+    
+    func processSentence(speech: String){
+        let aSpeech = speech.components(separatedBy: " ")
+        lblSpeaking.text = speech;
+        
+        /*var correctCnt = 0
+        
+        for i in 0..<aSpeech.count{
+            let wordIndex = nReadWordIndex + i
+            let speechWord = removeSpecialCharFrom(string: aSpeech[i].lowercased())
+            // if keep saying word correctly, just pass, if say incorrect, need to pause
+            if wordIndex < arrWords.count{
+                print("to compare with \(arrWords[wordIndex]) - \(speechWord)")
+                
+                if arrWords[wordIndex] == speechWord{
+                    correctCnt = i+1
+                    print("correct \(i)")
+                }else{
+                    print("incorrect\(i)")
+                    speechRecognizer.stopRecording(status: EndState.incorrect.rawValue)
+                    break
+                }
+            }
+        }
+        
+        nReadWordIndex += correctCnt
+        print("readWord: \(nReadWordIndex)")*/
+        
+        var posIncorrect = 0
+        
+        var isAllCorrect = true
+        for i in 0..<aSpeech.count{
+            let wordIndex = nReadWordIndex + i
+            let speechWord = removeSpecialCharFrom(string: aSpeech[i].lowercased())
+            
+            if speechWord.caseInsensitiveCompare(self.arrWords[wordIndex]) != ComparisonResult.orderedSame{
+                posIncorrect = i
+                isAllCorrect = false
+                break
+            }
+        }
+        
+        
+        if isAllCorrect {
+            
+        }else{
+            if posIncorrect > 0{
+                nReadWordIndex += posIncorrect
+            }
+            
+            speechRecognizer.stopRecording(status: EndState.incorrect.rawValue)
+        }
+        
+        print("readWord: \(nReadWordIndex), incorrectPos: \(posIncorrect)")
+        
+        var sRead = ""
+        for i in 0..<nReadWordIndex{
+            sRead += arrRawWords[i] + " "
+        }
+        print("-- \(sRead)")
+        lblSpeakCorrect.text = sRead
+        /*var isAllCorrect = true
+         
+         if arrSpeech.count > arrWords[nIdxSentence].count {
+            isAllCorrect = false
+         }
+         else{
+             for i in 0 ..< min(arrWords[nIdxSentence].count, arrSpeech.count){
+             if arrSpeech[i].caseInsensitiveCompare(self.arrWords[nIdxSentence][i]) != ComparisonResult.orderedSame {
+                     isAllCorrect = false
+                     break
+                 }
+             }
+         }
+         
+         if isAllCorrect {
+             if arrSpeech.count == self.arrWords[nIdxSentence].count{ //Whole Sentence Correct
+                //Prepare next sentence
+                 speechRecognizer.stopRecording(status: EndState.next.rawValue)
+                 print("correct sentence")
+             }else{ //Just spoke partial
+         
+             }
+         }else{ //incorrect
+             speechRecognizer.stopRecording(status: EndState.replay.rawValue)
+             wrongCnt += 1
+             print("incorrect")
+         }*/
     }
 }
 
