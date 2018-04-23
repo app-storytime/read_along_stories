@@ -76,6 +76,8 @@ class ExperienceViewController: BaseViewController {
     let synth = AVSpeechSynthesizer()
     var myUtterance = AVSpeechUtterance(string: "")
     
+    let txtSize = CGFloat(24.0)
+    let txtFont = "HelveticaNeue-Light"
     override open func viewDidLoad() {
         super.viewDidLoad()
         
@@ -109,7 +111,7 @@ class ExperienceViewController: BaseViewController {
         
         prepareStory()
         
-        createAnimation(name: "story1")
+        createAnimation(name: "PNGTest1")
         startSAnimation(loop: false, start: 0, end: 1)
         //startSAnimation(loop: false, start: (story?.scenes[0].fPosStart)!, end: (story?.scenes[0].fPosEnd)!)
     }
@@ -261,13 +263,16 @@ class ExperienceViewController: BaseViewController {
         timer.invalidate()
     }
 
+    var a = 0
     //UI Actions
     @IBAction func onTest(_ sender: Any) {
-        processSentence(speech: "This is")
-        processSentence(speech: "This is sentence")
-        processSentence(speech: "This is sentence aaa")
-        processSentence(speech: "one")
-        processSentence(speech: "one this is ss")
+        a = a+1
+        scrollTo(wordIndex: a)
+//        processSentence(speech: "This is")
+//        processSentence(speech: "This is sentence")
+//        processSentence(speech: "This is sentence aaa")
+//        processSentence(speech: "one")
+//        processSentence(speech: "one this is ss")
     }
     
     @IBAction func btnBackClicked(_ sender: Any) {
@@ -397,7 +402,7 @@ extension ExperienceViewController: SpeechRecognizerDelegate {
             if posIncorrect > 0{
                 nReadWordIdx += posIncorrect
             }
-            
+            setRedText(wrongIdx: nReadWordIdx)
             speechRecognizer.stopRecording(status: EndState.incorrect.rawValue)
         }
         
@@ -503,7 +508,7 @@ extension ExperienceViewController {
     func makeScrollTextView(scrollView: UIScrollView, displayStr:String) {
         //Make Scroll Text View
         let maxSize = CGSize(width: Int.max, height: 60)
-        let font = UIFont(name: "HelveticaNeue-Light", size: 24)!
+        let font = UIFont(name: txtFont, size: txtSize)!
         //key function is coming!!!
         let strSize = (displayStr as NSString).boundingRect(with: maxSize, options: NSStringDrawingOptions.usesLineFragmentOrigin, attributes: [NSAttributedStringKey.font : font], context: nil)
         
@@ -526,14 +531,54 @@ extension ExperienceViewController {
     
     func setBlueText(readCnt: Int){
         let startWordInfo = getWordInfo(byWordIndex: nReadWordIdx)
-        let endWordInfo = getWordInfo(byWordIndex: nReadWordIdx + readCnt-1)
+        let endWordInfo = getWordInfo(byWordIndex: nReadWordIdx + readCnt - 1)
         
+        setTextColor(startPos: startWordInfo.pos, length: endWordInfo.pos+endWordInfo.word.count - startWordInfo.pos, color: UIColor.blue)
+        
+        var nScrollIdx = nReadWordIdx + readCnt - 2
+        if nScrollIdx < 0{
+            nScrollIdx = 0
+        }
+        scrollTo(wordIndex: nScrollIdx)
+    }
+    
+    func setRedText(wrongIdx: Int){
+        let wordInfo = getWordInfo(byWordIndex: wrongIdx)
+        
+        setTextColor(startPos: wordInfo.pos, length: wordInfo.word.count, color: UIColor.red)
+        
+        var nScrollIdx = nReadWordIdx - 1
+        if nScrollIdx < 0{
+            nScrollIdx = 0
+        }
+        scrollTo(wordIndex: nScrollIdx)
+    }
+    
+    func setTextColor(startPos: Int, length: Int, color: UIColor){
         var mutableString = NSMutableAttributedString()
         mutableString = NSMutableAttributedString(string: sStorySentence)
-        mutableString.setAttributes([NSAttributedStringKey.font : UIFont(name: "HelveticaNeue-Light", size: CGFloat(24))!
-            , NSAttributedStringKey.foregroundColor : UIColor.blue], range: NSRange(location: startWordInfo.pos, length: endWordInfo.pos+endWordInfo.word.count - startWordInfo.pos))
+        
+        //read
+        if startPos > 0{
+            mutableString.setAttributes([NSAttributedStringKey.font : UIFont(name: txtFont, size: txtSize)!, NSAttributedStringKey.foregroundColor : UIColor.lightGray], range: NSRange(location: 0, length: startPos))
+        }
+        
+        //correct or wrong
+        mutableString.setAttributes([NSAttributedStringKey.font : UIFont(name: txtFont, size: txtSize)!, NSAttributedStringKey.foregroundColor : color], range: NSRange(location: startPos, length: length))
+        
+        //will read
+        mutableString.setAttributes([NSAttributedStringKey.font : UIFont(name: txtFont, size: txtSize)!, NSAttributedStringKey.foregroundColor : UIColor.black], range: NSRange(location: startPos+length, length: sStorySentence.count - (startPos+length)))
         
         textview.attributedText = mutableString
+    }
+    
+    func scrollTo(wordIndex: Int){
+        let maxSize = CGSize(width: Int.max, height: 60)
+        let font = UIFont(name: txtFont, size: txtSize)!
+        let wordInfo = getWordInfo(byWordIndex: wordIndex)
+        let subStr = sStorySentence.prefix(wordInfo.pos)
+        let strSize = (subStr as NSString).boundingRect(with: maxSize, options: NSStringDrawingOptions.usesLineFragmentOrigin, attributes: [NSAttributedStringKey.font : font], context: nil)
+        scrollView.setContentOffset(CGPoint(x: strSize.width, y: 0), animated: true)
     }
     
     func getRedColor(toText:String, wordPos: Int, wordLength: Int) -> NSMutableAttributedString{
@@ -546,7 +591,7 @@ extension ExperienceViewController {
         
         myMutableString = NSMutableAttributedString(string: toText)
         
-        myMutableString.setAttributes([NSAttributedStringKey.font : UIFont(name: "HelveticaNeue-Light", size: CGFloat(24))!
+        myMutableString.setAttributes([NSAttributedStringKey.font : UIFont(name: txtFont, size: txtSize)!
             , NSAttributedStringKey.foregroundColor : UIColor.red], range: NSRange(location:startPos,length:endPos - startPos))
         return myMutableString
     }
@@ -607,7 +652,7 @@ extension ExperienceViewController {
         
         myMutableString = NSMutableAttributedString(string: text)
         
-        myMutableString.setAttributes([NSAttributedStringKey.font : UIFont(name: "HelveticaNeue-Light", size: CGFloat(17.0))!
+        myMutableString.setAttributes([NSAttributedStringKey.font : UIFont(name: txtFont, size: txtSize)!
             , NSAttributedStringKey.foregroundColor : UIColor(red: 1.0, green: 0, blue: 0, alpha: 1.0)], range: NSRange(location:startPos,length:endPos - startPos))
         
         return myMutableString
