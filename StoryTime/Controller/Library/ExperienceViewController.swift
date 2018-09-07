@@ -48,7 +48,6 @@ class ExperienceViewController: BaseViewController {
     @IBOutlet weak var lblTitle: UILabel!
     
     @IBOutlet weak var lblScore: UILabel!
-    @IBOutlet weak var sliderScore: UISlider!
     
     private var storyAnimation: LOTAnimationView?
     
@@ -70,7 +69,8 @@ class ExperienceViewController: BaseViewController {
     var sStorySentence = ""
     var arrSWords: [[[String]]] = [] // Story Word by remove special characters - Scene/Sentence/Word
     var arrWords = [String]() //Whole story words without special
-    var arrRawWords: [String] = [] //Raw story words
+    var arrRawWords: [String]! //Raw story words
+    var arrScores: [Double]!
     var nReadWordIdx = 0
     var nAllCorrectCnt = 0
     
@@ -82,7 +82,7 @@ class ExperienceViewController: BaseViewController {
     let synth = AVSpeechSynthesizer()
     var myUtterance = AVSpeechUtterance(string: "")
     
-    let txtSize = CGFloat(36.0)
+    let txtSize = CGFloat(24.0)
     let txtFont = "HelveticaNeue-Light"
     override open func viewDidLoad() {
         super.viewDidLoad()
@@ -143,7 +143,7 @@ class ExperienceViewController: BaseViewController {
         
         sStorySentence = sStorySentence.trimmingCharacters(in: .whitespaces)
         arrRawWords = sStorySentence.components(separatedBy: " ")
-        
+        arrScores = [Double](repeating: 0.0, count: arrRawWords.count)
         makeScrollTextView(scrollView: scrollView, displayStr: sStorySentence)
     }
     
@@ -287,9 +287,7 @@ class ExperienceViewController: BaseViewController {
             openDicWith(word: sWord)
         }
     }
-    @IBAction func onSlider(_ sender: Any) {
-        lblScore.text = "Tol:" + String(sliderScore.value)
-    }
+    
 }
 
 extension ExperienceViewController: AVSpeechSynthesizerDelegate{
@@ -357,12 +355,14 @@ extension ExperienceViewController: SpeechRecognizerDelegate {
             let orgWord = self.arrWords[wordIndex]
             //if speechWord.caseInsensitiveCompare(self.arrWords[wordIndex]) != ComparisonResult.orderedSame{
             let score = speechWord.distance(between: orgWord)
-            lblScore.text = "Tol:" + String(sliderScore.value) + " | " + String(score) + " | " + orgWord + ":" + speechWord;
-            if score < Double(sliderScore.value) && !skipWord(speech: speechWord, org: orgWord){
+            lblScore.text = "Tol:" + String(g_fTolerance) + " | " + String(score) + " | " + orgWord + ":" + speechWord;
+            if score < g_fTolerance && !skipWord(speech: speechWord, org: orgWord){
                 posIncorrect = i
                 isAllCorrect = false
                 break
             }
+            
+            arrScores[wordIndex] = score
         }
         
         var nRealReadCnt = 0
@@ -507,7 +507,7 @@ extension ExperienceViewController {
         
         setTextColor(startPos: startWordInfo.pos, length: endWordInfo.pos+endWordInfo.wordOrg.count - startWordInfo.pos, color: UIColor.blue)
         
-        var nScrollIdx = nReadWordIdx + readCnt - 2
+        var nScrollIdx = nReadWordIdx + readCnt - 1
         if nScrollIdx < 0{
             nScrollIdx = 0
         }
