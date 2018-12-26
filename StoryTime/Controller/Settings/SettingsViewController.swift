@@ -22,22 +22,21 @@ UINavigationControllerDelegate{
     
     var picker:UIImagePickerController?=UIImagePickerController()
     
+    var bMusicOn = false
+    
     @IBAction func onSlider(_ sender: Any) {
         g_fTolerance = Double(sliderScore.value)
     }
     override func viewDidLoad() {
         super.viewDidLoad()
         //Rounded Button
-        btnStatistics.layer.cornerRadius = 10
-        btnHelp.layer.cornerRadius = 10
-        btnMusic.layer.cornerRadius = 10
-        btnStatistics.layer.borderWidth = 2
-        btnHelp.layer.borderWidth = 2
-        btnMusic.layer.borderWidth = 2
+        btnStatistics.layer.cornerRadius = 20
+        btnHelp.layer.cornerRadius = 20
+        
         imageUser.layer.cornerRadius = imageUser.frame.width / 2
         imageUser.layer.borderWidth = 2
         imageUser.clipsToBounds = true
-        
+        imageUser.layer.borderColor = #colorLiteral(red: 0.968627451, green: 0.5764705882, blue: 0.1176470588, alpha: 1)
         //Do any additional setup after loading the view.
         
         //Get User Photo and DisplayName From GameCenter
@@ -71,7 +70,12 @@ UINavigationControllerDelegate{
         
     }
     @IBAction func btnMusicClicked(_ sender: Any) {
-        
+        bMusicOn = !bMusicOn
+        if bMusicOn{
+            btnMusic.setImage(#imageLiteral(resourceName: "check_on"), for: .normal)
+        }else{
+            btnMusic.setImage(#imageLiteral(resourceName: "check_off"), for: .normal)
+        }
     }
     @IBAction func btnHelpClicked(_ sender: Any) {
 
