@@ -109,8 +109,8 @@ class ExperienceViewController: BaseViewController {
         
         prepareStory()
         
-        //createAnimation(name: "Story1_1")
-        //startSAnimation(loop: false, start: (story?.scenes[0].fPosStart)!, end: (story?.scenes[0].fPosEnd)!)
+        createAnimation(name: "Story1_1")
+        startSAnimation(loop: false, start: (story?.scenes[0].fPosStart)!, end: (story?.scenes[0].fPosEnd)!)
     }
     
     override func viewWillAppear(_ animated: Bool) {
@@ -404,7 +404,7 @@ extension ExperienceViewController: SpeechRecognizerDelegate {
         }
         
         if wordIndexInfo.scene != lastWordIndexInfo.scene{ //New Scene
-            //startSAnimation(loop: false, start: (story?.scenes[wordIndexInfo.scene].fPosStart)!, end: (story?.scenes[wordIndexInfo.scene].fPosEnd)!)
+            startSAnimation(loop: false, start: (story?.scenes[wordIndexInfo.scene].fPosStart)!, end: (story?.scenes[wordIndexInfo.scene].fPosEnd)!)
         }
         lastWordIndexInfo = wordIndexInfo
     }
